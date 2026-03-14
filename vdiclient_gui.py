@@ -287,7 +287,12 @@ class ProxmoxTkApp:
         top.pack(fill="x")
 
         self.status_var = tk.StringVar(value="A iniciar...")
-        status_label = tk.Label(top, textvariable=self.status_var, anchor="w", font=("Segoe UI", 10, "bold"))
+        status_label = tk.Label(
+            top,
+            textvariable=self.status_var,
+            anchor="w",
+            font=("Segoe UI", 10, "bold"),
+        )
         status_label.pack(fill="x")
 
         mid = tk.PanedWindow(self.root, orient="horizontal", sashrelief="raised")
@@ -298,26 +303,72 @@ class ProxmoxTkApp:
         mid.add(left_frame, stretch="always")
         mid.add(right_frame, stretch="always")
 
-        left_title = tk.Label(left_frame, text="Máquinas virtuais disponíveis", font=("Segoe UI", 11, "bold"))
+        left_title = tk.Label(
+            left_frame,
+            text="Máquinas virtuais disponíveis",
+            font=("Segoe UI", 11, "bold"),
+        )
         left_title.pack(anchor="w", padx=10, pady=(10, 5))
 
-        self.vm_container = tk.Frame(left_frame)
-        self.vm_container.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+        list_frame = tk.Frame(left_frame)
+        list_frame.pack(fill="both", expand=True, padx=10, pady=(0, 10))
 
-        right_title = tk.Label(right_frame, text="Registo", font=("Segoe UI", 11, "bold"))
+        self.vm_canvas = tk.Canvas(list_frame, highlightthickness=0)
+        self.vm_scrollbar = tk.Scrollbar(list_frame, orient="vertical", command=self.vm_canvas.yview)
+        self.vm_canvas.configure(yscrollcommand=self.vm_scrollbar.set)
+
+        self.vm_scrollbar.pack(side="right", fill="y")
+        self.vm_canvas.pack(side="left", fill="both", expand=True)
+
+        self.vm_container = tk.Frame(self.vm_canvas)
+        self.vm_canvas_window = self.vm_canvas.create_window(
+            (0, 0), window=self.vm_container, anchor="nw"
+        )
+
+        self.vm_container.bind("<Configure>", self._on_vm_frame_configure)
+        self.vm_canvas.bind("<Configure>", self._on_vm_canvas_configure)
+        self.vm_canvas.bind_all("<MouseWheel>", self._on_mousewheel)
+
+        right_title = tk.Label(
+            right_frame,
+            text="Registo",
+            font=("Segoe UI", 11, "bold"),
+        )
         right_title.pack(anchor="w", padx=10, pady=(10, 5))
 
-        self.log_box = scrolledtext.ScrolledText(right_frame, wrap="word", height=20, state="disabled")
+        self.log_box = scrolledtext.ScrolledText(
+            right_frame,
+            wrap="word",
+            height=20,
+            state="disabled",
+        )
         self.log_box.pack(fill="both", expand=True, padx=10, pady=(0, 10))
 
         bottom = tk.Frame(self.root, padx=10, pady=10)
         bottom.pack(fill="x", pady=(0, 10))
 
-        self.refresh_btn = tk.Button(bottom, text="Atualizar lista", command=self.refresh_vms, state="disabled")
+        self.refresh_btn = tk.Button(
+            bottom,
+            text="Atualizar lista",
+            command=self.refresh_vms,
+            state="disabled",
+        )
         self.refresh_btn.pack(side="left")
 
         self.exit_btn = tk.Button(bottom, text="Fechar", command=self.root.destroy)
         self.exit_btn.pack(side="right")
+
+    def _on_vm_frame_configure(self, event=None):
+        self.vm_canvas.configure(scrollregion=self.vm_canvas.bbox("all"))
+
+    def _on_vm_canvas_configure(self, event):
+        self.vm_canvas.itemconfigure(self.vm_canvas_window, width=event.width)
+
+    def _on_mousewheel(self, event):
+        try:
+            self.vm_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+        except Exception:
+            pass
 
     def log(self, message: str):
         self.root.after(0, self._append_log, message)
@@ -335,6 +386,7 @@ class ProxmoxTkApp:
         for widget in self.vm_container.winfo_children():
             widget.destroy()
         self.vm_buttons.clear()
+        self.root.after(10, self._on_vm_frame_configure)
 
     def add_vm_button(self, vm: dict):
         display_name = vm["name"] or f"VM {vm['vmid']}"
@@ -383,10 +435,7 @@ class ProxmoxTkApp:
         except Exception as e:
             self.set_status("Erro na inicialização")
             self.log(f"ERRO: {e}")
-            self.root.after(
-                0,
-                lambda: messagebox.showerror("Erro", str(e)),
-            )
+            self.root.after(0, lambda: messagebox.showerror("Erro", str(e)))
 
     def load_vms(self):
         self.set_status("A obter lista de VMs...")
@@ -404,6 +453,7 @@ class ProxmoxTkApp:
         for vm in vms:
             self.add_vm_button(vm)
         self.refresh_btn.configure(state="normal")
+        self.root.after(10, self._on_vm_frame_configure)
 
     def refresh_vms(self):
         self.clear_vm_buttons()
@@ -452,7 +502,7 @@ class ProxmoxTkApp:
 
 def main() -> int:
     root = tk.Tk()
-    app = ProxmoxTkApp(root)
+    ProxmoxTkApp(root)
     root.mainloop()
     return 0
 
