@@ -118,50 +118,35 @@ sudo apt install xorg xfce4 lightdm xinit
 2) Create a dedicated kiosk user (optional but recommended):
 
 ```bash
-sudo adduser --disabled-password --gecos "" kiosk
+sudo adduser --disabled-password --gecos "" vdiuser
 ```
 
 3) Configure LightDM autologin for the kiosk user: create `/etc/lightdm/lightdm.conf.d/50-autologin.conf` with:
 
 ```ini
 [Seat:*]
-autologin-user=kiosk
+autologin-user=vdiuser
 autologin-user-timeout=0
 user-session=xfce
 ```
 
-4) Install or copy the application into the kiosk user's home (example: `/home/kiosk/ProxmoxThinClient`) and create a small launcher script `start-vdiclient.sh` inside that folder:
+4) Install or copy the application into the kiosk user's home (example: `/home/vdiuser/ProxmoxThinClient`) and create a small launcher script `run.sh` inside that folder:
 
-```bash
-# as root or a user with permissions
-cp -r /path/to/ProxmoxThinClient /home/kiosk/ProxmoxThinClient
-chown -R kiosk:kiosk /home/kiosk/ProxmoxThinClient
-
-cat > /home/kiosk/ProxmoxThinClient/start-vdiclient.sh <<'EOF'
-#!/bin/bash
-cd "$(dirname "$0")"
-source venv/bin/activate
-exec python vdiclient.py
-EOF
-
-chmod +x /home/kiosk/ProxmoxThinClient/start-vdiclient.sh
-chown kiosk:kiosk /home/kiosk/ProxmoxThinClient/start-vdiclient.sh
-```
 
 5) Create an XFCE autostart desktop entry so the session launches the script on login:
 
 ```bash
-sudo -u kiosk mkdir -p /home/kiosk/.config/autostart
-cat > /home/kiosk/.config/autostart/vdiclient.desktop <<'EOF'
+sudo -u vdiuser mkdir -p /home/kiosk/.config/autostart
+cat > /home/vdiuser/.config/autostart/vdiclient.desktop <<'EOF'
 [Desktop Entry]
 Type=Application
 Name=Proxmox Thin Client
-Exec=/home/kiosk/ProxmoxThinClient/start-vdiclient.sh
+Exec=/home/vdiuser/ProxmoxThinClient/run.sh
 StartupNotify=false
 Terminal=false
 EOF
 
-chown kiosk:kiosk /home/kiosk/.config/autostart/vdiclient.desktop
+chown vdiuser:vdiuser /home/vdiuser/.config/autostart/vdiclient.desktop
 ```
 
 6) Optional: disable screen locking and automatic suspend for the kiosk session (you can use the XFCE GUI or run xfconf commands):
