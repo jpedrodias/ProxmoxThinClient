@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Proxmox Thin Client
+Exec=/home/vdiuser/ProxmoxThinClient/run.sh
+StartupNotify=false
+Terminal=false
+Icon=computer-fail
+Comment=
+Path=/home/vdiuser/ProxmoxThinClient
