@@ -1,7 +1,14 @@
-# ProxmoxThinClient
+# Proxmox Thin Client
 Script to connect to a Proxmox VM using SPICE
 
 
+
+# Proxmox Thin Client
+Script to connect to a Proxmox VM using SPICE
+
+![Proxmox Thin Client GUI](img/vdiclient_gui.png)
+
+# Setup — Linux
 # Setup — Linux
 **System requirements:**
 
