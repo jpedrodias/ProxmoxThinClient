@@ -3,7 +3,6 @@ import os
 import shutil
 import socket
 import subprocess
-import sys
 import time
 from pathlib import Path
 
@@ -35,7 +34,7 @@ def load_config() -> dict:
         "proxmox_port": parser.getint("proxmox", "port", fallback=8006),
         "username": parser.get("auth", "username"),
         "password": parser.get("auth", "password"),
-        "node": parser.get("vm", "node"),
+        "node": parser.get("vm", "node", fallback="").strip(),
         "vmid": parser.getint("vm", "vmid"),
         "verify_tls": parser.getboolean("connection", "verify_tls", fallback=False),
         "timeout": parser.getint("connection", "timeout", fallback=10),
@@ -137,6 +136,67 @@ def authenticate(session: requests.Session, cfg: dict) -> None:
     print(f"Autenticação OK. Utilizador: {auth_data.get('username')}")
 
 
+def select_assigned_vm(session: requests.Session, cfg: dict) -> None:
+    """
+    Se vmid = 0, escolhe a primeira VM visível ao utilizador autenticado.
+    A lista vem de /cluster/resources?type=vm.
+    """
+    if cfg["vmid"] != 0:
+        if not cfg["node"]:
+            raise RuntimeError("O campo 'node' tem de estar definido quando vmid > 0.")
+        return
+
+    r = session.get(
+        f"{cfg['base_url']}/cluster/resources",
+        params={"type": "vm"},
+        verify=cfg["verify_tls"],
+        timeout=cfg["timeout"],
+    )
+    print(f"HTTP {r.status_code}")
+    r.raise_for_status()
+
+    resources = r.json().get("data", [])
+    if not resources:
+        raise RuntimeError("Não foram encontradas VMs acessíveis para este utilizador.")
+
+    vms = []
+    for item in resources:
+        vmid = item.get("vmid")
+        node = item.get("node")
+        rtype = item.get("type")
+
+        # Em Proxmox, VMs QEMU aparecem tipicamente com type='qemu'.
+        # Mantemos apenas entradas com vmid e node válidos.
+        if vmid is None or not node:
+            continue
+        if rtype not in ("qemu", "vm", None):
+            continue
+
+        vms.append(
+            {
+                "vmid": int(vmid),
+                "node": str(node),
+                "name": item.get("name", ""),
+                "status": item.get("status", ""),
+            }
+        )
+
+    if not vms:
+        raise RuntimeError("Foram devolvidos recursos, mas nenhuma VM utilizável foi encontrada.")
+
+    vms.sort(key=lambda x: x["vmid"])
+    chosen = vms[0]
+
+    cfg["vmid"] = chosen["vmid"]
+    cfg["node"] = chosen["node"]
+
+    print(
+        f"vmid=0 detetado. "
+        f"VM escolhida: {cfg['vmid']} no node '{cfg['node']}'"
+        + (f" ({chosen['name']})" if chosen["name"] else "")
+    )
+
+
 def get_vm_status(session: requests.Session, cfg: dict) -> str:
     r = session.get(
         f"{cfg['base_url']}/nodes/{cfg['node']}/qemu/{cfg['vmid']}/status/current",
@@ -200,6 +260,7 @@ def request_spice(session: requests.Session, cfg: dict) -> dict:
     print("proxy original:", spice_data.get("proxy"))
     print("tls-port:", spice_data.get("tls-port"))
 
+    # Mantém o comportamento antigo que já funciona no teu cenário.
     spice_data["proxy"] = cfg["proxy_url"]
     print("proxy final:", spice_data.get("proxy"))
 
@@ -249,21 +310,29 @@ def main() -> int:
         print(f"ERRO na autenticação: {e}")
         return 2
 
-    print_step("Passo 3: verificar/ligar VM")
+    print_step("Passo 3: resolver VM")
+    try:
+        select_assigned_vm(session, cfg)
+        print(f"VM final a usar: vmid={cfg['vmid']} | node={cfg['node']}")
+    except Exception as e:
+        print(f"ERRO ao resolver a VM: {e}")
+        return 3
+
+    print_step("Passo 4: verificar/ligar VM")
     try:
         ensure_vm_running(session, cfg, wait_seconds=10)
     except Exception as e:
         print(f"ERRO ao verificar ou ligar a VM: {e}")
-        return 3
+        return 4
 
-    print_step("Passo 4: pedido de sessão SPICE")
+    print_step("Passo 5: pedido de sessão SPICE")
     try:
         spice_data = request_spice(session, cfg)
     except Exception as e:
         print(f"ERRO ao pedir sessão SPICE: {e}")
-        return 4
+        return 5
 
-    print_step("Passo 5: gerar ficheiro .vv")
+    print_step("Passo 6: gerar ficheiro .vv")
     try:
         vv_text = build_vv_exact(spice_data)
         vv_file = write_vv_file(cfg, vv_text)
@@ -273,9 +342,9 @@ def main() -> int:
         print("--- FIM DO FICHEIRO .vv ---")
     except Exception as e:
         print(f"ERRO a gerar ficheiro .vv: {e}")
-        return 5
+        return 6
 
-    print_step("Passo 6: executar remote-viewer")
+    print_step("Passo 7: executar remote-viewer")
     try:
         viewer = get_remote_viewer_command(cfg["remote_viewer_path"])
         print(f"A usar: {viewer}")
@@ -284,7 +353,7 @@ def main() -> int:
         return 0
     except Exception as e:
         print(f"ERRO ao executar remote-viewer: {e}")
-        return 6
+        return 7
 
 
 if __name__ == "__main__":
