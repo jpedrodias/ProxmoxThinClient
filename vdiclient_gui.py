@@ -16,7 +16,41 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 def script_ini_path() -> Path:
-    return Path(__file__).with_suffix(".ini")
+    script_path = Path(__file__).resolve()
+    script_stem = script_path.stem
+    script_dir = script_path.parent
+
+    candidates = [
+        script_dir / f"{script_stem}.ini",
+    ]
+
+    base_stem = script_stem
+    for suffix in ("_gui", "_cli", "_clt"):
+        if script_stem.endswith(suffix):
+            base_stem = script_stem[: -len(suffix)]
+            break
+
+    extra_names = [
+        f"{base_stem}_gui.ini",
+        f"{base_stem}_cli.ini",
+        f"{base_stem}_clt.ini",
+        f"{base_stem}.ini",
+    ]
+
+    for name in extra_names:
+        path = script_dir / name
+        if path not in candidates:
+            candidates.append(path)
+
+    for path in candidates:
+        if path.exists():
+            return path
+
+    searched = "\n - ".join(str(p) for p in candidates)
+    raise FileNotFoundError(
+        "Nenhum ficheiro de configuração foi encontrado. "
+        f"Foram procurados:\n - {searched}"
+    )
 
 
 def load_config() -> dict:
@@ -29,6 +63,7 @@ def load_config() -> dict:
     parser.read(ini_path, encoding="utf-8")
 
     cfg = {
+        "config_file": str(ini_path),
         "proxmox_host": parser.get("proxmox", "host"),
         "proxmox_port": parser.getint("proxmox", "port", fallback=8006),
         "username": parser.get("auth", "username"),
@@ -417,7 +452,7 @@ class ProxmoxTkApp:
         self.set_status("A carregar configuração...")
         try:
             self.cfg = load_config()
-            self.log("Configuração carregada com sucesso.")
+            self.log(f"Configuração carregada de: {self.cfg['config_file']}")
 
             self.set_status("A testar ligação TCP...")
             test_tcp_connectivity(

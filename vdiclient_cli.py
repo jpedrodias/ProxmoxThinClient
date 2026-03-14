@@ -17,7 +17,41 @@ def print_step(title: str) -> None:
 
 
 def script_ini_path() -> Path:
-    return Path(__file__).with_suffix(".ini")
+    script_path = Path(__file__).resolve()
+    script_stem = script_path.stem
+    script_dir = script_path.parent
+
+    candidates = [
+        script_dir / f"{script_stem}.ini",
+    ]
+
+    base_stem = script_stem
+    for suffix in ("_gui", "_cli", "_clt"):
+        if script_stem.endswith(suffix):
+            base_stem = script_stem[: -len(suffix)]
+            break
+
+    extra_names = [
+        f"{base_stem}_gui.ini",
+        f"{base_stem}_cli.ini",
+        f"{base_stem}_clt.ini",
+        f"{base_stem}.ini",
+    ]
+
+    for name in extra_names:
+        path = script_dir / name
+        if path not in candidates:
+            candidates.append(path)
+
+    for path in candidates:
+        if path.exists():
+            return path
+
+    searched = "\n - ".join(str(p) for p in candidates)
+    raise FileNotFoundError(
+        "No configuration file was found. "
+        f"Searched:\n - {searched}"
+    )
 
 
 def load_config() -> dict:
@@ -30,6 +64,7 @@ def load_config() -> dict:
     parser.read(ini_path, encoding="utf-8")
 
     cfg = {
+        "config_file": str(ini_path),
         "proxmox_host": parser.get("proxmox", "host"),
         "proxmox_port": parser.getint("proxmox", "port", fallback=8006),
         "username": parser.get("auth", "username"),
@@ -165,8 +200,6 @@ def select_assigned_vm(session: requests.Session, cfg: dict) -> None:
         node = item.get("node")
         rtype = item.get("type")
 
-        # In Proxmox, QEMU VMs typically appear with type='qemu'.
-        # We keep only entries with valid vmid and node.
         if vmid is None or not node:
             continue
         if rtype not in ("qemu", "vm", None):
@@ -260,7 +293,6 @@ def request_spice(session: requests.Session, cfg: dict) -> dict:
     print("original proxy:", spice_data.get("proxy"))
     print("tls-port:", spice_data.get("tls-port"))
 
-    # Keeps the previous behavior that already works in your scenario.
     spice_data["proxy"] = cfg["proxy_url"]
     print("final proxy:", spice_data.get("proxy"))
 
@@ -289,6 +321,7 @@ def launch_remote_viewer(viewer_cmd: str, vv_file: Path, fullscreen: bool = Fals
 def main() -> int:
     try:
         cfg = load_config()
+        print(f"Configuration file in use: {cfg['config_file']}")
     except Exception as e:
         print(f"ERROR loading configuration: {e}")
         return 10
