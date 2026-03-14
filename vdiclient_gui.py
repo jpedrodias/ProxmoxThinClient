@@ -304,11 +304,14 @@ def launch_remote_viewer(viewer_cmd: str, vv_file: Path, fullscreen: bool = Fals
     subprocess.Popen(cmd)
 
 
+   
+    
 class ProxmoxTkApp:
     def __init__(self, root: tk.Tk):
         self.root = root
         self.root.title("Proxmox VM Launcher")
         self.root.geometry("900x650")
+        self.center_window(900, 650)
 
         self.cfg = None
         self.session = requests.Session()
@@ -317,6 +320,17 @@ class ProxmoxTkApp:
         self.build_ui()
         self.start_initial_load()
 
+    def center_window(self, width: int = 900, height: int = 650):
+        self.root.update_idletasks()
+
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+
+        x = (screen_width // 2) - (width // 2)
+        y = (screen_height // 2) - (height // 2)
+
+        self.root.geometry(f"{width}x{height}+{x}+{y}")
+        
     def build_ui(self):
         top = tk.Frame(self.root, padx=10, pady=10)
         top.pack(fill="x")
@@ -537,7 +551,9 @@ class ProxmoxTkApp:
 
 def main() -> int:
     root = tk.Tk()
-    ProxmoxTkApp(root)
+    root.withdraw()
+    app = ProxmoxTkApp(root)
+    root.deiconify()
     root.mainloop()
     return 0
 
