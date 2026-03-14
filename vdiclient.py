@@ -3,6 +3,7 @@ import os
 import shutil
 import socket
 import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -153,7 +154,7 @@ def get_vm_status(session: requests.Session, cfg: dict) -> str:
     return status
 
 
-def ensure_vm_running(session: requests.Session, cfg: dict) -> None:
+def ensure_vm_running(session: requests.Session, cfg: dict, wait_seconds: int = 10) -> None:
     status = get_vm_status(session, cfg)
     print(f"Estado atual da VM {cfg['vmid']}: {status}")
 
@@ -173,7 +174,6 @@ def ensure_vm_running(session: requests.Session, cfg: dict) -> None:
     print(f"HTTP {r.status_code}")
     r.raise_for_status()
 
-    wait_seconds = cfg["wait_after_start"]
     print(f"VM iniciada. A aguardar {wait_seconds} segundos antes de continuar...")
     time.sleep(wait_seconds)
 
@@ -200,8 +200,6 @@ def request_spice(session: requests.Session, cfg: dict) -> dict:
     print("proxy original:", spice_data.get("proxy"))
     print("tls-port:", spice_data.get("tls-port"))
 
-    # Mantém exatamente o comportamento da versão que funcionava:
-    # força o proxy vindo do .ini em vez de usar o valor devolvido pela API.
     spice_data["proxy"] = cfg["proxy_url"]
     print("proxy final:", spice_data.get("proxy"))
 
@@ -253,7 +251,7 @@ def main() -> int:
 
     print_step("Passo 3: verificar/ligar VM")
     try:
-        ensure_vm_running(session, cfg)
+        ensure_vm_running(session, cfg, wait_seconds=10)
     except Exception as e:
         print(f"ERRO ao verificar ou ligar a VM: {e}")
         return 3
