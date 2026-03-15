@@ -466,7 +466,7 @@ class ProxmoxTkApp:
         self.set_status("A carregar configuração...")
         try:
             self.cfg = load_config()
-            self.log(f"Configuração carregada de: {self.cfg['config_file']}")
+            self.log(f"Configuração carregada.")
 
             self.set_status("A testar ligação TCP...")
             test_tcp_connectivity(
