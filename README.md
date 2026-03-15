@@ -1,6 +1,8 @@
 # Proxmox Thin Client
 Script to connect to a Proxmox VM using SPICE
 
+Inspired by: https://www.youtube.com/watch?v=oLatrZBFQrw https://github.com/joshpatten/PVE-VDIClient 
+
 
 
 # Proxmox Thin Client
@@ -170,3 +172,10 @@ sudo -u kiosk xfconf-query -c xfce4-power-manager -p /xfce4-power-manager/blank-
 Notes:
 - If you prefer not to use LightDM, you can configure auto-login via other display managers or run X from a systemd user service.
 - Keep the system updated and restrict SSH/console access for kiosk users as required by your security policy.
+
+
+---
+Prepare windows executable
+```bash
+pyinstaller --onefile --onedir --noconsole --noconfirm --hidden-import proxmoxer.backends --hidden-import proxmoxer.backends.https --hidden-import proxmoxer.backends.https.AuthenticationError --hidden-import proxmoxer.core --hidden-import proxmoxer.core.ResourceException --hidden-import subprocess.TimeoutExpired --hidden-import subprocess.CalledProcessError --hidden-import requests.exceptions --hidden-import requests.exceptions.ReadTimeout --hidden-import requests.exceptions.ConnectTimeout --hidden-import requests.exceptions.ConnectionError vdiclient_gui.py
+```
